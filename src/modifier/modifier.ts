@@ -6,7 +6,7 @@ import { allMoves } from "#app/data/move";
 import { MAX_PER_TYPE_POKEBALLS } from "#app/data/pokeball";
 import { type FormChangeItem, SpeciesFormChangeItemTrigger, SpeciesFormChangeLapseTeraTrigger, SpeciesFormChangeTeraTrigger } from "#app/data/pokemon-forms";
 import { getStatusEffectHealText } from "#app/data/status-effect";
-import { Type } from "#app/data/type";
+import { Type } from "#enums/type";
 import Pokemon, { type PlayerPokemon } from "#app/field/pokemon";
 import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
@@ -31,6 +31,7 @@ import i18next from "i18next";
 import { type DoubleBattleChanceBoosterModifierType, type EvolutionItemModifierType, type FormChangeItemModifierType, type ModifierOverride, type ModifierType, type PokemonBaseStatTotalModifierType, type PokemonExpBoosterModifierType, type PokemonFriendshipBoosterModifierType, type PokemonMoveAccuracyBoosterModifierType, type PokemonMultiHitModifierType, type TerastallizeModifierType, type TmModifierType, getModifierType, ModifierPoolType, ModifierTypeGenerator, modifierTypes, PokemonHeldItemModifierType } from "./modifier-type";
 import { Color, ShadowColor } from "#enums/color";
 import { FRIENDSHIP_GAIN_FROM_RARE_CANDY } from "#app/data/balance/starters";
+import { applyAbAttrs, CommanderAbAttr } from "#app/data/ability";
 
 export type ModifierPredicate = (modifier: Modifier) => boolean;
 
@@ -1937,10 +1938,16 @@ export class PokemonInstantReviveModifier extends PokemonHeldItemModifier {
    * @returns always `true`
    */
   override apply(pokemon: Pokemon): boolean {
+    // Restore the Pokemon to half HP
     pokemon.scene.unshiftPhase(new PokemonHealPhase(pokemon.scene, pokemon.getBattlerIndex(),
       toDmgValue(pokemon.getMaxHp() / 2), i18next.t("modifier:pokemonInstantReviveApply", { pokemonNameWithAffix: getPokemonNameWithAffix(pokemon), typeName: this.type.name }), false, false, true));
 
+    // Remove the Pokemon's FAINT status
     pokemon.resetStatus(true, false, true);
+
+    // Reapply Commander on the Pokemon's side of the field, if applicable
+    const field = pokemon.isPlayer() ? pokemon.scene.getPlayerField() : pokemon.scene.getEnemyField();
+    field.forEach((p) => applyAbAttrs(CommanderAbAttr, p, null, false));
     return true;
   }
 
@@ -2947,6 +2954,38 @@ export class ShinyRateBoosterModifier extends PersistentModifier {
 
   getMaxStackCount(scene: BattleScene): number {
     return 4;
+  }
+}
+
+export class CriticalCatchChanceBoosterModifier extends PersistentModifier {
+  constructor(type: ModifierType, stackCount?: number) {
+    super(type, stackCount);
+  }
+
+  match(modifier: Modifier): boolean {
+    return modifier instanceof CriticalCatchChanceBoosterModifier;
+  }
+
+  clone(): CriticalCatchChanceBoosterModifier {
+    return new CriticalCatchChanceBoosterModifier(this.type, this.stackCount);
+  }
+
+  /**
+   * Applies {@linkcode CriticalCatchChanceBoosterModifier}
+   * @param boost {@linkcode NumberHolder} holding the boost value
+   * @returns always `true`
+   */
+  override apply(boost: NumberHolder): boolean {
+    // 1 stack: 2x
+    // 2 stack: 2.5x
+    // 3 stack: 3x
+    boost.value *= 1.5 + this.getStackCount() / 2;
+
+    return true;
+  }
+
+  getMaxStackCount(scene: BattleScene): number {
+    return 3;
   }
 }
 

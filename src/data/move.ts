@@ -29,6 +29,7 @@ import { BATTLE_STATS, type BattleStat, EFFECTIVE_STATS, type EffectiveStat, get
 import { BattleEndPhase } from "#app/phases/battle-end-phase";
 import { MoveEndPhase } from "#app/phases/move-end-phase";
 import { MovePhase } from "#app/phases/move-phase";
+import { MoveEffectPhase } from "#app/phases/move-effect-phase";
 import { NewBattlePhase } from "#app/phases/new-battle-phase";
 import { PokemonHealPhase } from "#app/phases/pokemon-heal-phase";
 import { StatStageChangePhase } from "#app/phases/stat-stage-change-phase";
@@ -2257,6 +2258,51 @@ export class MultiHitAttr extends MoveAttr {
           return total + (pokemon.id === user.id ? 1 : pokemon?.status && pokemon.status.effect !== StatusEffect.NONE ? 0 : 1);
         }, 0);
     }
+  }
+}
+
+export class SmartTargetingAttr extends MoveAttr {
+  constructor() {
+    super();
+    console.log("GHNote constructor MoveRedirectAttr called.");
+  }
+
+  apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    console.log("GHNote apply MoveRedirectAttr called.");
+    return false;
+  }
+}
+
+export class DragonDartsTargetingAttr extends SmartTargetingAttr {
+  constructor() {
+    super();
+    console.log("GHNote constructor DDTargetingAttr called.");
+  }
+
+  apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    const targets = user.getOpponents();
+
+    const moveset = user.getMoveset();
+    const moveIndex = moveset.findIndex(moves => moves?.getMove() === move);
+
+    const targetsEffectiveness = targets.map(pokemon => pokemon.getMoveEffectiveness(user, move));
+    const targetIndex = targets.findIndex(pokemon => pokemon === target);
+
+    targets.forEach(pokemon => console.log(`${pokemon.name}`));
+    console.log(`GHNote target Effectiveness: ${targetsEffectiveness}`);
+    console.log(`GHNote target Index: ${targetIndex}`);
+
+    /**
+     * If the current target is immune to the current move
+     */
+    if (target.getMoveEffectiveness(user, move) === 1) {
+      targets.splice(targetIndex, 1);
+      target = targets.at(0) ?? target;
+    }
+
+    console.log(`GHNote target at end of apply: ${target.name}`);
+    user.scene.unshiftPhase(new MoveEffectPhase(user.scene, BattlerIndex.ATTACKER, [ target.getBattlerIndex() ], moveset[moveIndex]!));
+    return true;
   }
 }
 
@@ -10233,6 +10279,7 @@ export function initMoves() {
     new AttackMove(Moves.DRAGON_DARTS, Type.DRAGON, MoveCategory.PHYSICAL, 50, 100, 10, -1, 0, 8)
       .attr(MultiHitAttr, MultiHitType._2)
       .makesContact(false)
+      .attr(DragonDartsTargetingAttr)
       .partial(), // smart targetting is unimplemented
     new StatusMove(Moves.TEATIME, Type.NORMAL, -1, 10, -1, 0, 8)
       .attr(EatBerryAttr)

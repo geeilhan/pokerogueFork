@@ -41,6 +41,7 @@ import {
   NoEffectAttr,
   OneHitKOAttr,
   OverrideMoveEffectAttr,
+  SmartTargetingAttr,
   ToxicAccuracyAttr,
   VariableTargetAttr,
 } from "#app/data/move";
@@ -145,6 +146,7 @@ export class MoveEffectPhase extends PokemonPhase {
       if (user.turnData.hitsLeft === -1) {
         const hitCount = new NumberHolder(1);
         // Assume single target for multi hit
+        console.log("GHNote MultiHitAttr called.");
         applyMoveAttrs(MultiHitAttr, user, this.getFirstTarget() ?? null, move, hitCount);
         // If Parental Bond is applicable, add another hit
         applyPreAttackAbAttrs(AddSecondStrikeAbAttr, user, null, move, false, hitCount, null);
@@ -153,6 +155,17 @@ export class MoveEffectPhase extends PokemonPhase {
         // Set the user's relevant turnData fields to reflect the final hit count
         user.turnData.hitCount = hitCount.value;
         user.turnData.hitsLeft = hitCount.value;
+      }
+
+      /**
+       * If the move has a smart targeting function it is called here.
+       * This {@linkcode SmartTargetingAttr} redirects the move according
+       * to the {@linkcode Move} targeting function.
+       */
+      if (move.findAttr((attr) => attr instanceof SmartTargetingAttr)) {
+        console.log("GHNote SmartTargeting called & targets are:");
+        this.targets.forEach(index => console.log(`${BattlerIndex[index]}`));
+        applyMoveAttrs(SmartTargetingAttr, user, this.getFirstTarget() ?? null, move);
       }
 
       /**

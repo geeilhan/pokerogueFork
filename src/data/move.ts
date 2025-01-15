@@ -2273,6 +2273,10 @@ export class SmartTargetingAttr extends MoveAttr {
   }
 }
 
+/**
+ * This is an Attribute that decides the target of Dragon Darts due to
+ * its smart targeting effect.
+ */
 export class DragonDartsTargetingAttr extends SmartTargetingAttr {
   constructor() {
     super();
@@ -2280,6 +2284,9 @@ export class DragonDartsTargetingAttr extends SmartTargetingAttr {
   }
 
   apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    /**
+     * These variables save current battle data in order to decide who to attack during a double battle
+     */
     const targets = user.getOpponents();
 
     const moveset = user.getMoveset();
@@ -2295,12 +2302,16 @@ export class DragonDartsTargetingAttr extends SmartTargetingAttr {
     /**
      * If the current target is immune to the current move
      */
-    if (target.getMoveEffectiveness(user, move) === 1) {
+    if (target.getMoveEffectiveness(user, move) === 0) {
       targets.splice(targetIndex, 1);
       target = targets.at(0) ?? target;
     }
 
     console.log(`GHNote target at end of apply: ${target.name}`);
+    /**
+     * Unshifts current MoveEffectPhase and creates a new one
+     * Note: This currently does not work correctly
+     */
     user.scene.unshiftPhase(new MoveEffectPhase(user.scene, BattlerIndex.ATTACKER, [ target.getBattlerIndex() ], moveset[moveIndex]!));
     return true;
   }
